@@ -8,15 +8,13 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f8; padding: 20px; margin: 0; color: #333; }
         .container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        
         h3 { text-align: center; margin: 0 0 20px 0; font-weight: 700; }
-        
         .input-group { margin-bottom: 15px; position: relative; }
         label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; font-weight: 500; }
         input { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; background: #fff; }
         input:focus { border-color: #ff7652; outline: none; }
         
-        /* Список підказок вулиць */
+        /* Список підказок */
         #suggestions {
             position: absolute; top: 75px; left: 0; right: 0;
             background: white; border: 1px solid #ddd; border-radius: 12px;
@@ -25,17 +23,13 @@
         }
         .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; }
         .suggestion-item:last-child { border-bottom: none; }
-        .suggestion-item:hover { background-color: #fff5f2; color: #ff7652; }
-
-        .row { display: flex; gap: 10px; }
         
+        .row { display: flex; gap: 10px; }
         .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
         .pay-btn { flex: 1; text-align: center; padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; font-weight: 600; font-size: 14px; }
         .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         
         .submit-btn { width: 100%; background: #ff7652; color: white; border: none; padding: 16px; border-radius: 16px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .submit-btn:active { transform: scale(0.98); }
-        
         .hidden { display: none; }
     </style>
 </head>
@@ -46,7 +40,7 @@
 
     <div class="input-group">
         <label>Адреса (Жешув)</label>
-        <input type="text" id="address" placeholder="Почніть вводити вулицю..." autocomplete="off" oninput="searchAddress()">
+        <input type="text" id="address" placeholder="Вулиця..." autocomplete="off" oninput="searchAddress()">
         <div id="suggestions"></div>
     </div>
 
@@ -79,84 +73,44 @@
     tg.expand();
     let payType = 'cash'; 
 
-    // --- ПОШУК АДРЕСИ (Безкоштовний OpenStreetMap) ---
-    let debounceTimer;
-    async function searchAddress() {
-        const query = document.getElementById('address').value;
-        const list = document.getElementById('suggestions');
-        
-        if (query.length < 3) { list.style.display = 'none'; return; }
+    // --- ФУНКЦІЯ ВІДПРАВКИ З ПЕРЕВІРКОЮ ПОМИЛОК ---
+    function send() {
+        try {
+            // Збираємо дані
+            const addr = document.getElementById('address').value;
+            const apt = document.getElementById('apt').value || "-";
+            const fl = document.getElementById('floor').value || "-";
+            const ph = document.getElementById('phone').value || "-";
+            const sm = document.getElementById('sum').value;
 
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-            // Обмежуємо пошук Польщею та районом Жешува (viewbox)
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&countrycodes=pl&viewbox=21.9,49.95,22.1,50.10&bounded=0&limit=5`;
+            // Перевірка
+            if(!addr) { 
+                tg.showAlert("Помилка: Ви не ввели адресу!"); 
+                return; 
+            }
+            if(payType === 'cash' && !sm) { 
+                tg.showAlert("Помилка: Ви не ввели суму!"); 
+                return; 
+            }
+
+            // Формуємо об'єкт
+            let data = {
+                address: addr,
+                apt: apt,
+                floor: fl,
+                phone: ph,
+                sum: sm,
+                payType: payType
+            };
+
+            // ВІДПРАВКА
+            tg.sendData(JSON.stringify(data));
             
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                list.innerHTML = '';
-                if (data.length > 0) {
-                    list.style.display = 'block';
-                    data.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'suggestion-item';
-                        // Скорочуємо назву для краси
-                        let shortName = item.display_name.split(',')[0] + ', ' + item.display_name.split(',')[1];
-                        div.innerText = shortName;
-                        div.onclick = () => {
-                            document.getElementById('address').value = shortName;
-                            list.style.display = 'none';
-                        };
-                        list.appendChild(div);
-                    });
-                } else {
-                    list.style.display = 'none';
-                }
-            } catch (e) { console.error(e); }
-        }, 300); // Чекаємо 300мс поки ти друкуєш
-    }
-
-    // Ховаємо список, якщо клікнули повз
-    document.addEventListener('click', function(e) {
-        if (e.target.id !== 'address') document.getElementById('suggestions').style.display = 'none';
-    });
-
-    function togglePay(type) {
-        payType = type;
-        document.getElementById('btn-cash').className = type === 'cash' ? 'pay-btn active' : 'pay-btn';
-        document.getElementById('btn-online').className = type === 'online' ? 'pay-btn active' : 'pay-btn';
-        
-        const sumBox = document.getElementById('sum-wrapper');
-        if (type === 'online') {
-            sumBox.classList.add('hidden');
-            document.getElementById('sum').value = '';
-        } else {
-            sumBox.classList.remove('hidden');
+        } catch (e) {
+            // ЯКЩО ЩОСЬ ЗЛАМАЛОСЬ - ПОКАЖЕ ТУТ
+            alert("Критична помилка JS: " + e.message);
         }
     }
 
-    function send() {
-        const addr = document.getElementById('address').value;
-        const apt = document.getElementById('apt').value;
-        const fl = document.getElementById('floor').value;
-        const ph = document.getElementById('phone').value;
-        const sm = document.getElementById('sum').value;
-
-        if(!addr) { tg.showAlert("Введіть адресу!"); return; }
-        if(payType === 'cash' && !sm) { tg.showAlert("Введіть суму!"); return; }
-
-        let data = {
-            address: addr,
-            apt: apt,
-            floor: fl,
-            phone: ph,
-            sum: sm,
-            payType: payType
-        };
-        tg.sendData(JSON.stringify(data));
-    }
-</script>
-</body>
-</html>
+    // --- ПОШУК АДРЕСИ ---
+    let debounce
