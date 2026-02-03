@@ -1,131 +1,132 @@
-import asyncio
-import logging
-import json
-import urllib.parse
-from datetime import datetime
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-# --- НАЛАШТУВАННЯ ---
-API_TOKEN = '8342216853:AAF-_LtBQejUR1Wx9FS9mA0dmWPZuiEei58'
-ADMIN_ID = 6889016268
-COURIER_CHAT_ID = -1003843457222
-WEB_APP_URL = "https://myshchyshyn9898-bit.github.io/delivery-bot/" 
-
-logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-scheduler = AsyncIOScheduler(timezone="Europe/Warsaw")
-orders_db = []
-
-# --- СТАРТ ---
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="📝 Створити замовлення", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ], resize_keyboard=True)
-    await message.answer("👇 Натисни кнопку ВНИЗУ для створення замовлення:", reply_markup=kb)
-
-# --- ОБРОБКА ЗАМОВЛЕННЯ ---
-@dp.message(F.content_type == types.ContentType.WEB_APP_DATA)
-async def web_app_data_handler(message: types.Message):
-    try:
-        data = json.loads(message.web_app_data.data)
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Замовлення v5 (Stable)</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
+        .container { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
-        # Отримуємо дані
-        address = data['address']
-        apt = data.get('apt', '-')
-        floor = data.get('floor', '-')
-        phone = data.get('phone', '-')
-        notes = data.get('notes', '') # Примітки (можуть бути пусті)
-        pay_type = data['payType']
-
-        # Форматуємо оплату (Готівку виділяємо жирним і знаком оклику)
-        if pay_type == 'cash':
-            amount = float(data['sum'])
-            money_str = f"💵 **Готівка:** ❗️ __{amount:.2f} zł__ ❗️"
-        else:
-            amount = 0
-            money_str = f"💳 **Оплата:** ОНЛАЙН (Сплачено)"
-
-        # Формуємо примітки (якщо є)
-        notes_str = f"\n📝 **Інфо:** {notes}" if notes else ""
-
-        # --- КРАСИВИЙ ДИЗАЙН ПОВІДОМЛЕННЯ ---
-        courier_text = (
-            f"📦 **НОВЕ ЗАМОВЛЕННЯ**\n"
-            f"➖➖➖➖➖➖➖➖➖➖\n"
-            f"📍 **{address}**\n\n"
-            f"🚪 **Кв:** {apt}   🪜 **Пов:** {floor}\n"
-            f"📞 **Тел:** `{phone}`\n"
-            f"{notes_str}\n\n"
-            f"{money_str}\n"
-            f"➖➖➖➖➖➖➖➖➖➖"
-        )
-
-        # Посилання на карту (Універсальне)
-        encoded_addr = urllib.parse.quote(address)
-        maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_addr}"
+        h3 { text-align: center; margin: 0 0 20px 0; font-weight: 700; }
         
-        callback_data = f"close_{pay_type}_{amount}"
+        .input-wrapper { margin-bottom: 15px; position: relative; }
+        label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; font-weight: 500; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; background: #fff; }
+        input:focus { border-color: #ff7652; outline: none; }
         
-        kb_courier = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🗺 Маршрут", url=maps_url)],
-            [InlineKeyboardButton(text="✅ Закрити замовлення", callback_data=callback_data)]
-        ])
-
-        await bot.send_message(COURIER_CHAT_ID, courier_text, reply_markup=kb_courier, parse_mode="Markdown")
-        await message.answer(f"✅ Опубліковано!")
+        #suggestions {
+            position: absolute; top: 72px; left: 0; right: 0;
+            background: white; border: 1px solid #ccc; border-radius: 10px;
+            z-index: 999; max-height: 200px; overflow-y: auto;
+            display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
         
-    except Exception as e:
-        print(f"❌ ПОМИЛКА: {e}")
-        await message.answer(f"Помилка: {e}")
-
-# --- ЗАКРИТТЯ ---
-@dp.callback_query(F.data.startswith("close_"))
-async def close_order(callback: types.CallbackQuery):
-    try:
-        parts = callback.data.split("_")
-        p_type = parts[1]
-        amount = float(parts[2])
-        courier = callback.from_user.first_name
-
-        original_text = callback.message.text
-        time_now = datetime.now().strftime("%H:%M")
+        .row { display: flex; gap: 10px; }
+        .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
+        .pay-btn { flex: 1; text-align: center; padding: 12px; border-radius: 10px; font-weight: 600; font-size: 14px; transition: 0.2s; cursor: pointer; }
+        .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
-        # Змінюємо заголовок на "Закрито"
-        new_text = original_text.replace("📦 **НОВЕ ЗАМОВЛЕННЯ**", f"🔴 **ЗАКРИТО** ({time_now} - {courier})")
-        # Прибираємо кнопки
-        await callback.message.edit_text(new_text, reply_markup=None)
+        .main-btn { width: 100%; background: #ff7652; color: white; padding: 16px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-        orders_db.append({"courier": courier, "type": p_type, "amount": amount})
-        await callback.answer(f"Прийнято! {amount} zł.")
-    except Exception as e:
-        print(f"Помилка закриття: {e}")
+<div class="container">
+    <h3>Нове замовлення</h3>
 
-# --- ЗВІТ ---
-async def send_daily_report():
-    if not orders_db: return
-    stats = {}
-    total_cash = 0
-    for o in orders_db:
-        name = o['courier']
-        if name not in stats: stats[name] = {"cash": 0, "online": 0, "total": 0}
-        stats[name]["total"] += 1
-        if o['type'] == 'cash':
-            stats[name]["cash"] += o['amount']
-            total_cash += o['amount']
-        else:
-            stats[name]["online"] += 1
+    <div class="input-wrapper">
+        <label>Адреса (Жешув)</label>
+        <input type="text" id="address" placeholder="Введіть вулицю..." oninput="onAddrInput()" autocomplete="off">
+        <div id="suggestions"></div>
+    </div>
 
-    report = "📊 **ЗВІТ (23:00)**\n➖➖➖➖➖➖➖➖➖➖\n\n"
-    for name, d in stats.items():
-        report += f"👤 **{name}**: {d['total']} зам. | {d['cash']:.2f} zł\n"
-    report += f"➖➖➖➖➖➖➖➖➖➖\n💰 **ВСЯ КАСА:** {total_cash:.2f} zł"
-    await bot.send_message(COURIER_CHAT_ID, report, parse_mode="Markdown")
-    orders_db.clear()
+    <div class="row">
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt" placeholder="-"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor" placeholder="-"></div>
+    </div>
 
-scheduler.add_job(send_daily_report
+    <div class="input-wrapper">
+        <label>Телефон</label>
+        <input type="tel" id="phone" placeholder="511...">
+    </div>
+
+    <label>Оплата</label>
+    <div class="pay-group">
+        <div class="pay-btn active" id="btn-cash" onclick="setPay('cash')">💵 Готівка</div>
+        <div class="pay-btn" id="btn-online" onclick="setPay('online')">💳 Онлайн</div>
+    </div>
+
+    <div class="input-wrapper" id="sum-block">
+        <label>Сума (zł)</label>
+        <input type="number" id="sum" placeholder="0.00">
+    </div>
+
+    <button class="main-btn" onclick="sendData()">Опублікувати</button>
+</div>
+
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand(); 
+    let currentPay = 'cash';
+
+    function setPay(type) {
+        currentPay = type;
+        document.getElementById('btn-cash').className = (type === 'cash') ? 'pay-btn active' : 'pay-btn';
+        document.getElementById('btn-online').className = (type === 'online') ? 'pay-btn active' : 'pay-btn';
+        
+        const sumEl = document.getElementById('sum-block');
+        if(type === 'online') {
+            sumEl.style.display = 'none';
+            document.getElementById('sum').value = '';
+        } else {
+            sumEl.style.display = 'block';
+        }
+    }
+
+    function sendData() {
+        try {
+            let addr = document.getElementById('address').value;
+            let apt = document.getElementById('apt').value || "-";
+            let floor = document.getElementById('floor').value || "-";
+            let phone = document.getElementById('phone').value || "-";
+            let sum = document.getElementById('sum').value;
+
+            if(addr.length < 3) {
+                tg.showAlert("Введіть адресу!");
+                return;
+            }
+            if(currentPay === 'cash' && (!sum || sum === "0")) {
+                tg.showAlert("Введіть суму!");
+                return;
+            }
+
+            let data = {
+                address: addr,
+                apt: apt,
+                floor: floor,
+                phone: phone,
+                sum: sum,
+                payType: currentPay
+            };
+
+            tg.sendData(JSON.stringify(data));
+            
+        } catch (e) {
+            alert("Помилка: " + e.message);
+        }
+    }
+
+    // Пошук (OpenStreetMap)
+    let timer;
+    function onAddrInput() {
+        let val = document.getElementById('address').value;
+        let list = document.getElementById('suggestions');
+        
+        if(val.length < 3) { list.style.display = 'none'; return; }
+
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+            fetch('
