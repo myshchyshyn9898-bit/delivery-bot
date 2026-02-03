@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення v4</title>
+    <title>Замовлення v5</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
@@ -28,12 +28,25 @@
         .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
         .main-btn { width: 100%; background: #ff7652; color: white; padding: 15px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; }
+
+        /* Лог для помилок */
+        #debug-log { 
+            margin-top: 20px; 
+            padding: 10px; 
+            background: #ffe6e6; 
+            border: 1px solid #ffcccc; 
+            color: #d8000c; 
+            font-size: 12px; 
+            border-radius: 8px;
+            display: none; 
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h3>Нове замовлення (v4)</h3>
+    <h3>Нове замовлення (v5 Debug)</h3>
 
     <div class="input-wrapper">
         <label>Адреса (Жешув)</label>
@@ -63,6 +76,8 @@
     </div>
 
     <button class="main-btn" onclick="sendData()">Опублікувати</button>
+    
+    <div id="debug-log">Статус: Очікування...</div>
 </div>
 
 <script>
@@ -70,12 +85,17 @@
     tg.expand(); 
     let currentPay = 'cash';
 
-    // Функція вибору оплати
+    // Функція для запису логів на екран
+    function log(msg) {
+        const logEl = document.getElementById('debug-log');
+        logEl.style.display = 'block';
+        logEl.innerHTML += "<br>> " + msg;
+    }
+
     function setPay(type) {
         currentPay = type;
         document.getElementById('btn-cash').className = (type === 'cash') ? 'pay-btn active' : 'pay-btn';
         document.getElementById('btn-online').className = (type === 'online') ? 'pay-btn active' : 'pay-btn';
-        
         const sumEl = document.getElementById('sum-block');
         if(type === 'online') {
             sumEl.style.display = 'none';
@@ -85,8 +105,8 @@
         }
     }
 
-    // Функція відправки (Кнопка)
     function sendData() {
+        log("Натиснуто кнопку 'Опублікувати'");
         try {
             let addr = document.getElementById('address').value;
             let apt = document.getElementById('apt').value || "-";
@@ -95,11 +115,13 @@
             let sum = document.getElementById('sum').value;
 
             if(addr.length < 3) {
-                tg.showAlert("Помилка: Введіть адресу!");
+                log("Помилка: Коротка адреса");
+                tg.showAlert("Введіть адресу!");
                 return;
             }
             if(currentPay === 'cash' && (!sum || sum === "0")) {
-                tg.showAlert("Помилка: Введіть суму!");
+                log("Помилка: Немає суми");
+                tg.showAlert("Введіть суму!");
                 return;
             }
 
@@ -112,11 +134,22 @@
                 payType: currentPay
             };
 
-            // ВІДПРАВЛЯЄМО
+            log("Дані зібрано. Спроба відправки...");
+            log("JSON: " + JSON.stringify(data));
+
+            // Відправка
             tg.sendData(JSON.stringify(data));
+            log("Команда sendData виконана.");
+            
+            // Спробуємо закрити примусово, якщо sendData не спрацює
+            setTimeout(() => {
+                log("Спроба примусового закриття...");
+                tg.close();
+            }, 1000);
             
         } catch (e) {
-            alert("Помилка коду: " + e.message);
+            log("КРИТИЧНА ПОМИЛКА: " + e.message);
+            alert("Помилка: " + e.message);
         }
     }
 
@@ -126,10 +159,7 @@
         let val = document.getElementById('address').value;
         let list = document.getElementById('suggestions');
         
-        if(val.length < 3) {
-            list.style.display = 'none';
-            return;
-        }
+        if(val.length < 3) { list.style.display = 'none'; return; }
 
         clearTimeout(timer);
         timer = setTimeout(function() {
@@ -149,11 +179,9 @@
                         };
                         list.appendChild(div);
                     });
-                } else {
-                    list.style.display = 'none';
-                }
+                } else { list.style.display = 'none'; }
             })
-            .catch(err => console.log(err));
+            .catch(err => log("Помилка карти: " + err));
         }, 300);
     }
     
