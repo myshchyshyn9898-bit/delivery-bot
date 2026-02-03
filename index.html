@@ -3,114 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення</title>
+    <title>Замовлення v3</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f8; padding: 20px; margin: 0; color: #333; }
-        .container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h3 { text-align: center; margin: 0 0 20px 0; font-weight: 700; }
-        .input-group { margin-bottom: 15px; position: relative; }
-        label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; font-weight: 500; }
-        input { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; background: #fff; }
-        input:focus { border-color: #ff7652; outline: none; }
+        body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
+        .container { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
-        /* Список підказок */
+        h3 { text-align: center; margin: 0 0 20px 0; }
+        
+        .input-wrapper { margin-bottom: 15px; position: relative; }
+        label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; }
+        
+        /* Стиль для списку вулиць */
         #suggestions {
-            position: absolute; top: 75px; left: 0; right: 0;
-            background: white; border: 1px solid #ddd; border-radius: 12px;
-            z-index: 1000; max-height: 200px; overflow-y: auto;
-            display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: absolute; top: 70px; left: 0; right: 0;
+            background: white; border: 1px solid #ccc; border-radius: 10px;
+            z-index: 999; max-height: 200px; overflow-y: auto;
+            display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-        .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; }
-        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
         
         .row { display: flex; gap: 10px; }
-        .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
-        .pay-btn { flex: 1; text-align: center; padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; font-weight: 600; font-size: 14px; }
-        .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         
-        .submit-btn { width: 100%; background: #ff7652; color: white; border: none; padding: 16px; border-radius: 16px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
+        .pay-btn { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .main-btn { width: 100%; background: #ff7652; color: white; padding: 15px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; }
+        
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h3>Нове замовлення</h3>
+    <h3>Нове замовлення (v3)</h3>
 
-    <div class="input-group">
+    <div class="input-wrapper">
         <label>Адреса (Жешув)</label>
-        <input type="text" id="address" placeholder="Вулиця..." autocomplete="off" oninput="searchAddress()">
+        <input type="text" id="address" placeholder="Введіть вулицю..." oninput="onAddrInput()" autocomplete="off">
         <div id="suggestions"></div>
     </div>
 
     <div class="row">
-        <div style="flex:1" class="input-group"><label>Кв/Офіс</label><input type="text" id="apt"></div>
-        <div style="flex:1" class="input-group"><label>Поверх</label><input type="text" id="floor"></div>
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor"></div>
     </div>
 
-    <div class="input-group">
+    <div class="input-wrapper">
         <label>Телефон</label>
-        <input type="tel" id="phone" placeholder="+48 XXX XXX XXX">
+        <input type="tel" id="phone" placeholder="+48...">
     </div>
 
-    <label>Спосіб оплати</label>
+    <label>Оплата</label>
     <div class="pay-group">
-        <div class="pay-btn active" id="btn-cash" onclick="togglePay('cash')">💵 Готівка</div>
-        <div class="pay-btn" id="btn-online" onclick="togglePay('online')">💳 Онлайн</div>
+        <div class="pay-btn active" id="btn-cash" onclick="setPay('cash')">💵 Готівка</div>
+        <div class="pay-btn" id="btn-online" onclick="setPay('online')">💳 Онлайн</div>
     </div>
 
-    <div class="input-group" id="sum-wrapper">
-        <label>Сума до сплати (zł)</label>
+    <div class="input-wrapper" id="sum-block">
+        <label>Сума (zł)</label>
         <input type="number" id="sum" placeholder="0.00">
     </div>
 
-    <button class="submit-btn" onclick="send()">Опублікувати</button>
+    <button class="main-btn" onclick="sendData()">Опублікувати</button>
 </div>
 
 <script>
+    // Ініціалізація Телеграму
     let tg = window.Telegram.WebApp;
-    tg.expand();
-    let payType = 'cash'; 
+    tg.expand(); 
+    let currentPay = 'cash';
 
-    // --- ФУНКЦІЯ ВІДПРАВКИ З ПЕРЕВІРКОЮ ПОМИЛОК ---
-    function send() {
-        try {
-            // Збираємо дані
-            const addr = document.getElementById('address').value;
-            const apt = document.getElementById('apt').value || "-";
-            const fl = document.getElementById('floor').value || "-";
-            const ph = document.getElementById('phone').value || "-";
-            const sm = document.getElementById('sum').value;
-
-            // Перевірка
-            if(!addr) { 
-                tg.showAlert("Помилка: Ви не ввели адресу!"); 
-                return; 
-            }
-            if(payType === 'cash' && !sm) { 
-                tg.showAlert("Помилка: Ви не ввели суму!"); 
-                return; 
-            }
-
-            // Формуємо об'єкт
-            let data = {
-                address: addr,
-                apt: apt,
-                floor: fl,
-                phone: ph,
-                sum: sm,
-                payType: payType
-            };
-
-            // ВІДПРАВКА
-            tg.sendData(JSON.stringify(data));
-            
-        } catch (e) {
-            // ЯКЩО ЩОСЬ ЗЛАМАЛОСЬ - ПОКАЖЕ ТУТ
-            alert("Критична помилка JS: " + e.message);
+    // 1. Функція вибору оплати
+    function setPay(type) {
+        currentPay = type;
+        // Змінюємо кольори кнопок
+        document.getElementById('btn-cash').className = (type === 'cash') ? 'pay-btn active' : 'pay-btn';
+        document.getElementById('btn-online').className = (type === 'online') ? 'pay-btn active' : 'pay-btn';
+        
+        // Ховаємо суму
+        const sumEl = document.getElementById('sum-block');
+        if(type === 'online') {
+            sumEl.style.display = 'none';
+            document.getElementById('sum').value = '';
+        } else {
+            sumEl.style.display = 'block';
         }
     }
 
-    // --- ПОШУК АДРЕСИ ---
-    let debounce
+    // 2. Функція відправки (Кнопка)
+    function sendData() {
+        // Збираємо значення
+        let addr = document.getElementById('address').value;
+        let apt = document.getElementById('apt').value || "-";
+        let floor = document.getElementById('floor').value || "-";
+        let phone = document.getElementById('phone').value || "-";
+        let sum = document.getElementById('sum').value;
+
+        // Перевірки
+        if(addr.length < 3) {
+            tg.showAlert("Введіть адресу!");
+            return;
+        }
+        if(currentPay === 'cash' && (!sum || sum === "0")) {
+            tg.showAlert("Введіть суму готівки!");
+            return;
+        }
+
+        // Формуємо дані
+        let data = {
+            address: addr,
+            apt: apt,
+            floor: floor,
+            phone: phone,
+            sum: sum,
+            payType: currentPay
+        };
+
+        // ВІДПРАВЛЯЄМО В БОТА
+        tg.sendData(JSON.stringify(data));
+    }
+
+    // 3. Пошук вулиць (OpenStreetMap)
+    let timer;
+    function onAddrInput() {
+        let val = document.getElementById('address').value;
+        let list = document.getElementById('suggestions');
+        
+        if(val.length < 3) {
+            list.style.display = 'none';
+            return;
+        }
+
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+            // Запит до OpenStreetMap (обмеження по Польщі)
+            fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=pl&q=' + val)
+            .then(res => res.json())
+            .then(data => {
+                list.innerHTML = "";
+                if(data.length > 0) {
+                    list.style.display = 'block';
+                    data.forEach(item => {
+                        // Тільки якщо це в Жешуві (перевірка по тексту) або поруч
+                        let div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        // Беремо коротку назву
+                        div.innerText = item.display_name.split(',').slice(0,3).join(',');
+                        
+                        div.onclick = function() {
+                            document.getElementById('address').value = div.innerText;
+                            list.style.display = 'none';
+                        };
+                        list.appendChild(div);
+                    });
+                } else {
+                    list.style.display = 'none';
+                }
+            })
+            .catch(err => console.log(err));
+        }, 300);
+    }
+    
+    // Приховати список, якщо клік не по ньому
+    document.addEventListener('click', function(e) {
+        if(e.target.id !== 'address') {
+            document.getElementById('suggestions').style.display = 'none';
+        }
+    });
+
+</script>
+</body>
+</html>
