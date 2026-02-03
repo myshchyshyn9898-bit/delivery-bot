@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення v5</title>
+    <title>Замовлення v6 (Comments)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
@@ -12,7 +12,8 @@
         
         .input-wrapper { margin-bottom: 15px; position: relative; }
         label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; }
-        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; font-family: sans-serif; }
+        textarea { resize: vertical; height: 60px; }
         
         #suggestions {
             position: absolute; top: 70px; left: 0; right: 0;
@@ -28,25 +29,12 @@
         .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
         .main-btn { width: 100%; background: #ff7652; color: white; padding: 15px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; }
-
-        /* Лог для помилок */
-        #debug-log { 
-            margin-top: 20px; 
-            padding: 10px; 
-            background: #ffe6e6; 
-            border: 1px solid #ffcccc; 
-            color: #d8000c; 
-            font-size: 12px; 
-            border-radius: 8px;
-            display: none; 
-            word-wrap: break-word;
-        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h3>Нове замовлення (v5 Debug)</h3>
+    <h3>Нове замовлення</h3>
 
     <div class="input-wrapper">
         <label>Адреса (Жешув)</label>
@@ -55,8 +43,8 @@
     </div>
 
     <div class="row">
-        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt"></div>
-        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor"></div>
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt" placeholder="-"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor" placeholder="-"></div>
     </div>
 
     <div class="input-wrapper">
@@ -75,9 +63,12 @@
         <input type="number" id="sum" placeholder="0.00">
     </div>
 
+    <div class="input-wrapper">
+        <label>Коментар (Код, деталі...)</label>
+        <textarea id="comment" placeholder="Примітки для кур'єра..."></textarea>
+    </div>
+
     <button class="main-btn" onclick="sendData()">Опублікувати</button>
-    
-    <div id="debug-log">Статус: Очікування...</div>
 </div>
 
 <script>
@@ -85,17 +76,11 @@
     tg.expand(); 
     let currentPay = 'cash';
 
-    // Функція для запису логів на екран
-    function log(msg) {
-        const logEl = document.getElementById('debug-log');
-        logEl.style.display = 'block';
-        logEl.innerHTML += "<br>> " + msg;
-    }
-
     function setPay(type) {
         currentPay = type;
         document.getElementById('btn-cash').className = (type === 'cash') ? 'pay-btn active' : 'pay-btn';
         document.getElementById('btn-online').className = (type === 'online') ? 'pay-btn active' : 'pay-btn';
+        
         const sumEl = document.getElementById('sum-block');
         if(type === 'online') {
             sumEl.style.display = 'none';
@@ -106,21 +91,19 @@
     }
 
     function sendData() {
-        log("Натиснуто кнопку 'Опублікувати'");
         try {
             let addr = document.getElementById('address').value;
             let apt = document.getElementById('apt').value || "-";
             let floor = document.getElementById('floor').value || "-";
             let phone = document.getElementById('phone').value || "-";
             let sum = document.getElementById('sum').value;
+            let comment = document.getElementById('comment').value || ""; // Беремо коментар
 
             if(addr.length < 3) {
-                log("Помилка: Коротка адреса");
                 tg.showAlert("Введіть адресу!");
                 return;
             }
             if(currentPay === 'cash' && (!sum || sum === "0")) {
-                log("Помилка: Немає суми");
                 tg.showAlert("Введіть суму!");
                 return;
             }
@@ -131,29 +114,18 @@
                 floor: floor,
                 phone: phone,
                 sum: sum,
-                payType: currentPay
+                payType: currentPay,
+                comment: comment // Відправляємо коментар
             };
 
-            log("Дані зібрано. Спроба відправки...");
-            log("JSON: " + JSON.stringify(data));
-
-            // Відправка
             tg.sendData(JSON.stringify(data));
-            log("Команда sendData виконана.");
-            
-            // Спробуємо закрити примусово, якщо sendData не спрацює
-            setTimeout(() => {
-                log("Спроба примусового закриття...");
-                tg.close();
-            }, 1000);
             
         } catch (e) {
-            log("КРИТИЧНА ПОМИЛКА: " + e.message);
             alert("Помилка: " + e.message);
         }
     }
 
-    // Пошук вулиць
+    // Пошук
     let timer;
     function onAddrInput() {
         let val = document.getElementById('address').value;
@@ -181,14 +153,12 @@
                     });
                 } else { list.style.display = 'none'; }
             })
-            .catch(err => log("Помилка карти: " + err));
+            .catch(err => console.log(err));
         }, 300);
     }
     
     document.addEventListener('click', function(e) {
-        if(e.target.id !== 'address') {
-            document.getElementById('suggestions').style.display = 'none';
-        }
+        if(e.target.id !== 'address') document.getElementById('suggestions').style.display = 'none';
     });
 </script>
 </body>
