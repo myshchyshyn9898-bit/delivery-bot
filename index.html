@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Замовлення</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=ТВІЙ_КЛЮЧ&libraries=places&language=pl"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f8; padding: 20px; margin: 0; }
+        .container { background: white; border-radius: 20px; padding: 20px; }
+        
+        h3 { text-align: center; margin: 0 0 20px 0; }
+        
+        label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; margin-bottom: 15px; font-size: 16px;}
+        
+        .row { display: flex; gap: 10px; }
+        
+        /* Кнопки вибору оплати */
+        .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
+        .pay-btn { flex: 1; text-align: center; padding: 10px; border-radius: 10px; cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 14px; }
+        .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        .submit-btn { width: 100%; background: #ff7652; color: white; border: none; padding: 16px; border-radius: 16px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3>Нове замовлення</h3>
+
+    <label>Адреса (Жешув)</label>
+    <input type="text" id="address" placeholder="Вулиця...">
+
+    <div class="row">
+        <div style="flex:1"><label>Кв/Офіс</label><input type="text" id="apt"></div>
+        <div style="flex:1"><label>Поверх</label><input type="text" id="floor"></div>
+    </div>
+
+    <label>Телефон</label>
+    <input type="tel" id="phone" placeholder="+48...">
+
+    <label>Оплата</label>
+    <div class="pay-group">
+        <div class="pay-btn active" id="btn-cash" onclick="togglePay('cash')">💵 Готівка</div>
+        <div class="pay-btn" id="btn-online" onclick="togglePay('online')">💳 Онлайн</div>
+    </div>
+
+    <div id="sum-wrapper">
+        <label>Сума (zł)</label>
+        <input type="number" id="sum" placeholder="0.00">
+    </div>
+
+    <button class="submit-btn" onclick="send()">Відправити</button>
+</div>
+
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+    let payType = 'cash'; // За замовчуванням готівка
+
+    // Налаштування карт під Жешув
+    function initMap() {
+        let input = document.getElementById('address');
+        let options = {
+            componentRestrictions: { country: 'pl' }, // Шукати тільки в Польщі
+            bounds: new google.maps.LatLngBounds(
+                new google.maps.LatLng(49.95, 21.90), // Південний захід (приблизно)
+                new google.maps.LatLng(50.10, 22.10)  // Північний схід (приблизно)
+            )
+        };
+        new google.maps.places.Autocomplete(input, options);
+    }
+
+    // Перемикач Готівка / Онлайн
+    function togglePay(type) {
+        payType = type;
+        document.getElementById('btn-cash').className = type === 'cash' ? 'pay-btn active' : 'pay-btn';
+        document.getElementById('btn-online').className = type === 'online' ? 'pay-btn active' : 'pay-btn';
+        
+        // Ховаємо суму, якщо Онлайн
+        let sumBox = document.getElementById('sum-wrapper');
+        if (type === 'online') {
+            sumBox.classList.add('hidden');
+            document.getElementById('sum').value = '';
+        } else {
+            sumBox.classList.remove('hidden');
+        }
+    }
+
+    // Відправка даних боту
+    function send() {
+        let data = {
+            address: document.getElementById('address').value,
+            apt: document.getElementById('apt').value,
+            floor: document.getElementById('floor').value,
+            phone: document.getElementById('phone').value,
+            sum: document.getElementById('sum').value,
+            payType: payType
+        };
+        tg.sendData(JSON.stringify(data));
+    }
+
+    window.onload = initMap;
+</script>
+
+</body>
+</html>
