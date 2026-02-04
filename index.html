@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення v6 (Comments)</title>
+    <title>Замовлення v6 (Stable + Comments)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
@@ -43,8 +43,8 @@
     </div>
 
     <div class="row">
-        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt" placeholder="-"></div>
-        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor" placeholder="-"></div>
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor"></div>
     </div>
 
     <div class="input-wrapper">
@@ -64,8 +64,8 @@
     </div>
 
     <div class="input-wrapper">
-        <label>Коментар (Код, деталі...)</label>
-        <textarea id="comment" placeholder="Примітки для кур'єра..."></textarea>
+        <label>Коментар (необов'язково)</label>
+        <textarea id="comment" placeholder="Код, поверх, прохання..."></textarea>
     </div>
 
     <button class="main-btn" onclick="sendData()">Опублікувати</button>
@@ -97,7 +97,7 @@
             let floor = document.getElementById('floor').value || "-";
             let phone = document.getElementById('phone').value || "-";
             let sum = document.getElementById('sum').value;
-            let comment = document.getElementById('comment').value || ""; // Беремо коментар
+            let comment = document.getElementById('comment').value || ""; // Беремо текст
 
             if(addr.length < 3) {
                 tg.showAlert("Введіть адресу!");
@@ -115,7 +115,7 @@
                 phone: phone,
                 sum: sum,
                 payType: currentPay,
-                comment: comment // Відправляємо коментар
+                comment: comment
             };
 
             tg.sendData(JSON.stringify(data));
