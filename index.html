@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення (Жешув)</title>
+    <title>Замовлення (Stable + Map)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
@@ -75,6 +75,8 @@
     let tg = window.Telegram.WebApp;
     tg.expand(); 
     let currentPay = 'cash';
+    let selectedLat = null; // Для координат
+    let selectedLon = null;
 
     function setPay(type) {
         currentPay = type;
@@ -108,7 +110,9 @@
                 phone: phone,
                 sum: sum,
                 payType: currentPay,
-                comment: comment
+                comment: comment,
+                lat: selectedLat, // Відправляємо координати
+                lon: selectedLon
             };
 
             tg.sendData(JSON.stringify(data));
@@ -116,17 +120,18 @@
         } catch (e) { alert("Помилка: " + e.message); }
     }
 
-    // --- РОЗУМНИЙ ПОШУК (Fix) ---
+    // --- ПОШУК (З координатами) ---
     let timer;
     function onAddrInput() {
         let val = document.getElementById('address').value;
         let list = document.getElementById('suggestions');
         
+        selectedLat = null; selectedLon = null;
+        
         if(val.length < 3) { list.style.display = 'none'; return; }
 
         clearTimeout(timer);
         timer = setTimeout(function() {
-            // viewbox=... обмежує пошук координатами навколо Жешува
             fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=pl&viewbox=21.70,50.30,22.30,49.80&bounded=1&q=' + val)
             .then(res => res.json())
             .then(data => {
@@ -137,14 +142,11 @@
                         let div = document.createElement('div');
                         div.className = 'suggestion-item';
                         
-                        // ЧИСТА АДРЕСА: Вулиця + Номер + Місто
                         let street = item.address.road || item.address.pedestrian || item.address.suburb || "";
                         let number = item.address.house_number || "";
                         let city = item.address.city || item.address.town || item.address.village || "Rzeszów";
-                        
                         if (!street) street = item.display_name.split(',')[0];
 
-                        // Склеюємо
                         let cleanAddress = street;
                         if(number) cleanAddress += " " + number;
                         cleanAddress += ", " + city;
@@ -152,6 +154,8 @@
                         div.innerText = cleanAddress;
                         div.onclick = function() {
                             document.getElementById('address').value = cleanAddress;
+                            selectedLat = item.lat; // Запам'ятовуємо
+                            selectedLon = item.lon;
                             list.style.display = 'none';
                         };
                         list.appendChild(div);
