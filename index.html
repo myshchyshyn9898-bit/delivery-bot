@@ -3,34 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення v7 (Smart Search)</title>
+    <title>Замовлення v5 (Stable + Search 20km)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
+        body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
         .container { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h3 { text-align: center; margin: 0 0 20px 0; font-weight: 700; }
+        h3 { text-align: center; margin: 0 0 20px 0; }
         
         .input-wrapper { margin-bottom: 15px; position: relative; }
-        label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; font-weight: 500; }
-        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; font-family: inherit; background: #fff; }
-        textarea { resize: vertical; min-height: 60px; }
-        input:focus, textarea:focus { border-color: #ff7652; outline: none; }
-        
+        label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; font-family: sans-serif; }
+        textarea { resize: vertical; height: 60px; } /* Стиль для коментаря */
+
         #suggestions {
-            position: absolute; top: 72px; left: 0; right: 0;
+            position: absolute; top: 70px; left: 0; right: 0;
             background: white; border: 1px solid #ccc; border-radius: 10px;
-            z-index: 999; max-height: 250px; overflow-y: auto;
+            z-index: 999; max-height: 200px; overflow-y: auto;
             display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-        .suggestion-item { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; cursor: pointer; }
-        .suggestion-item:active { background: #f0f0f0; }
+        .suggestion-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
         
         .row { display: flex; gap: 10px; }
         .pay-group { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
-        .pay-btn { flex: 1; text-align: center; padding: 12px; border-radius: 10px; font-weight: 600; font-size: 14px; transition: 0.2s; cursor: pointer; }
+        .pay-btn { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; transition: 0.2s; }
         .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
-        .main-btn { width: 100%; background: #ff7652; color: white; padding: 16px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        .main-btn { width: 100%; background: #ff7652; color: white; padding: 15px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; }
+
+        /* Лог для помилок */
+        #debug-log { 
+            margin-top: 20px; 
+            padding: 10px; 
+            background: #ffe6e6; 
+            border: 1px solid #ffcccc; 
+            color: #d8000c; 
+            font-size: 12px; 
+            border-radius: 8px;
+            display: none; 
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -40,18 +51,18 @@
 
     <div class="input-wrapper">
         <label>Адреса (Жешув + 20км)</label>
-        <input type="text" id="address" placeholder="Почніть вводити вулицю..." oninput="onAddrInput()" autocomplete="off">
+        <input type="text" id="address" placeholder="Введіть вулицю..." oninput="onAddrInput()" autocomplete="off">
         <div id="suggestions"></div>
     </div>
 
     <div class="row">
-        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt" placeholder="-"></div>
-        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor" placeholder="-"></div>
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor"></div>
     </div>
 
     <div class="input-wrapper">
         <label>Телефон</label>
-        <input type="tel" id="phone" placeholder="511...">
+        <input type="tel" id="phone" placeholder="+48...">
     </div>
 
     <label>Оплата</label>
@@ -67,10 +78,12 @@
 
     <div class="input-wrapper">
         <label>Коментар (необов'язково)</label>
-        <textarea id="comment" placeholder="Код домофону, прохання..."></textarea>
+        <textarea id="comment" placeholder="Код домофону, поверх..."></textarea>
     </div>
 
     <button class="main-btn" onclick="sendData()">Опублікувати</button>
+    
+    <div id="debug-log">Статус: Очікування...</div>
 </div>
 
 <script>
@@ -78,11 +91,16 @@
     tg.expand(); 
     let currentPay = 'cash';
 
+    function log(msg) {
+        const logEl = document.getElementById('debug-log');
+        logEl.style.display = 'block';
+        logEl.innerHTML += "<br>> " + msg;
+    }
+
     function setPay(type) {
         currentPay = type;
         document.getElementById('btn-cash').className = (type === 'cash') ? 'pay-btn active' : 'pay-btn';
         document.getElementById('btn-online').className = (type === 'online') ? 'pay-btn active' : 'pay-btn';
-        
         const sumEl = document.getElementById('sum-block');
         if(type === 'online') {
             sumEl.style.display = 'none';
@@ -93,16 +111,25 @@
     }
 
     function sendData() {
+        log("Натиснуто кнопку 'Опублікувати'");
         try {
             let addr = document.getElementById('address').value;
             let apt = document.getElementById('apt').value || "-";
             let floor = document.getElementById('floor').value || "-";
             let phone = document.getElementById('phone').value || "-";
             let sum = document.getElementById('sum').value;
-            let comment = document.getElementById('comment').value || "";
+            let comment = document.getElementById('comment').value || ""; // Беремо коментар
 
-            if(addr.length < 3) { tg.showAlert("Введіть адресу!"); return; }
-            if(currentPay === 'cash' && (!sum || sum === "0")) { tg.showAlert("Введіть суму!"); return; }
+            if(addr.length < 3) {
+                log("Помилка: Коротка адреса");
+                tg.showAlert("Введіть адресу!");
+                return;
+            }
+            if(currentPay === 'cash' && (!sum || sum === "0")) {
+                log("Помилка: Немає суми");
+                tg.showAlert("Введіть суму!");
+                return;
+            }
 
             let data = {
                 address: addr,
@@ -111,15 +138,23 @@
                 phone: phone,
                 sum: sum,
                 payType: currentPay,
-                comment: comment
+                comment: comment // Відправляємо коментар
             };
 
+            log("Дані зібрано. Відправка...");
             tg.sendData(JSON.stringify(data));
             
-        } catch (e) { alert("Помилка: " + e.message); }
+            setTimeout(() => {
+                tg.close();
+            }, 1000);
+            
+        } catch (e) {
+            log("КРИТИЧНА ПОМИЛКА: " + e.message);
+            alert("Помилка: " + e.message);
+        }
     }
 
-    // --- РОЗУМНИЙ ПОШУК (Жешув + 20км) ---
+    // --- ОНОВЛЕНИЙ ПОШУК (20км + Чиста адреса) ---
     let timer;
     function onAddrInput() {
         let val = document.getElementById('address').value;
@@ -129,8 +164,7 @@
 
         clearTimeout(timer);
         timer = setTimeout(function() {
-            // viewbox=... обмежує пошук координатами навколо Жешува
-            // addressdetails=1 дає нам чисту назву вулиці та міста
+            // viewbox розширено до ~20км навколо Жешува. bounded=1 тримає пошук в цьому квадраті.
             fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=pl&viewbox=21.70,50.30,22.30,49.80&bounded=1&q=' + val)
             .then(res => res.json())
             .then(data => {
@@ -141,21 +175,18 @@
                         let div = document.createElement('div');
                         div.className = 'suggestion-item';
                         
-                        // ФОРМУЄМО КРАСИВУ АДРЕСУ
-                        // Беремо тільки: Вулиця + Номер + Місто (або село)
+                        // ФОРМУЄМО ЧИСТУ АДРЕСУ: Вулиця + Номер + Місто
                         let street = item.address.road || item.address.pedestrian || item.address.suburb || "";
                         let number = item.address.house_number || "";
                         let city = item.address.city || item.address.town || item.address.village || "";
                         
-                        // Якщо немає вулиці, беремо назву об'єкта (наприклад, Galeria Rzeszów)
-                        if (!street) street = item.display_name.split(',')[0];
+                        if (!street) street = item.display_name.split(',')[0]; // Якщо вулиці немає, беремо назву об'єкта
 
                         let cleanAddress = "";
                         if(street) cleanAddress += street;
                         if(number) cleanAddress += " " + number;
                         if(city) cleanAddress += ", " + city;
 
-                        // Показуємо користувачу
                         div.innerText = cleanAddress;
                         
                         div.onclick = function() {
@@ -166,12 +197,14 @@
                     });
                 } else { list.style.display = 'none'; }
             })
-            .catch(err => console.log(err));
+            .catch(err => log("Помилка карти: " + err));
         }, 300);
     }
     
     document.addEventListener('click', function(e) {
-        if(e.target.id !== 'address') document.getElementById('suggestions').style.display = 'none';
+        if(e.target.id !== 'address') {
+            document.getElementById('suggestions').style.display = 'none';
+        }
     });
 </script>
 </body>
