@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Замовлення v5 (Stable + Search 20km)</title>
+    <title>Замовлення (Жешув)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f8; padding: 20px; margin: 0; color: #333; }
@@ -13,7 +13,7 @@
         .input-wrapper { margin-bottom: 15px; position: relative; }
         label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; }
         input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; font-family: sans-serif; }
-        textarea { resize: vertical; height: 60px; } /* Стиль для коментаря */
+        textarea { resize: vertical; height: 60px; }
 
         #suggestions {
             position: absolute; top: 70px; left: 0; right: 0;
@@ -29,19 +29,6 @@
         .pay-btn.active { background: white; color: #ff7652; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
         .main-btn { width: 100%; background: #ff7652; color: white; padding: 15px; border: none; border-radius: 14px; font-size: 18px; font-weight: bold; margin-top: 10px; }
-
-        /* Лог для помилок */
-        #debug-log { 
-            margin-top: 20px; 
-            padding: 10px; 
-            background: #ffe6e6; 
-            border: 1px solid #ffcccc; 
-            color: #d8000c; 
-            font-size: 12px; 
-            border-radius: 8px;
-            display: none; 
-            word-wrap: break-word;
-        }
     </style>
 </head>
 <body>
@@ -50,14 +37,14 @@
     <h3>Нове замовлення</h3>
 
     <div class="input-wrapper">
-        <label>Адреса (Жешув + 20км)</label>
-        <input type="text" id="address" placeholder="Введіть вулицю..." oninput="onAddrInput()" autocomplete="off">
+        <label>Адреса (Жешув + околиці)</label>
+        <input type="text" id="address" placeholder="Почніть вводити вулицю..." oninput="onAddrInput()" autocomplete="off">
         <div id="suggestions"></div>
     </div>
 
     <div class="row">
-        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt"></div>
-        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor"></div>
+        <div style="flex:1" class="input-wrapper"><label>Кв.</label><input type="text" id="apt" placeholder="-"></div>
+        <div style="flex:1" class="input-wrapper"><label>Пов.</label><input type="text" id="floor" placeholder="-"></div>
     </div>
 
     <div class="input-wrapper">
@@ -77,25 +64,17 @@
     </div>
 
     <div class="input-wrapper">
-        <label>Коментар (необов'язково)</label>
-        <textarea id="comment" placeholder="Код домофону, поверх..."></textarea>
+        <label>Коментар (Код, деталі...)</label>
+        <textarea id="comment" placeholder="Примітки..."></textarea>
     </div>
 
     <button class="main-btn" onclick="sendData()">Опублікувати</button>
-    
-    <div id="debug-log">Статус: Очікування...</div>
 </div>
 
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand(); 
     let currentPay = 'cash';
-
-    function log(msg) {
-        const logEl = document.getElementById('debug-log');
-        logEl.style.display = 'block';
-        logEl.innerHTML += "<br>> " + msg;
-    }
 
     function setPay(type) {
         currentPay = type;
@@ -111,25 +90,16 @@
     }
 
     function sendData() {
-        log("Натиснуто кнопку 'Опублікувати'");
         try {
             let addr = document.getElementById('address').value;
             let apt = document.getElementById('apt').value || "-";
             let floor = document.getElementById('floor').value || "-";
             let phone = document.getElementById('phone').value || "-";
             let sum = document.getElementById('sum').value;
-            let comment = document.getElementById('comment').value || ""; // Беремо коментар
+            let comment = document.getElementById('comment').value || "";
 
-            if(addr.length < 3) {
-                log("Помилка: Коротка адреса");
-                tg.showAlert("Введіть адресу!");
-                return;
-            }
-            if(currentPay === 'cash' && (!sum || sum === "0")) {
-                log("Помилка: Немає суми");
-                tg.showAlert("Введіть суму!");
-                return;
-            }
+            if(addr.length < 3) { tg.showAlert("Введіть адресу!"); return; }
+            if(currentPay === 'cash' && (!sum || sum === "0")) { tg.showAlert("Введіть суму!"); return; }
 
             let data = {
                 address: addr,
@@ -138,23 +108,15 @@
                 phone: phone,
                 sum: sum,
                 payType: currentPay,
-                comment: comment // Відправляємо коментар
+                comment: comment
             };
 
-            log("Дані зібрано. Відправка...");
             tg.sendData(JSON.stringify(data));
             
-            setTimeout(() => {
-                tg.close();
-            }, 1000);
-            
-        } catch (e) {
-            log("КРИТИЧНА ПОМИЛКА: " + e.message);
-            alert("Помилка: " + e.message);
-        }
+        } catch (e) { alert("Помилка: " + e.message); }
     }
 
-    // --- ОНОВЛЕНИЙ ПОШУК (20км + Чиста адреса) ---
+    // --- РОЗУМНИЙ ПОШУК (Fix) ---
     let timer;
     function onAddrInput() {
         let val = document.getElementById('address').value;
@@ -164,7 +126,7 @@
 
         clearTimeout(timer);
         timer = setTimeout(function() {
-            // viewbox розширено до ~20км навколо Жешува. bounded=1 тримає пошук в цьому квадраті.
+            // viewbox=... обмежує пошук координатами навколо Жешува
             fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=pl&viewbox=21.70,50.30,22.30,49.80&bounded=1&q=' + val)
             .then(res => res.json())
             .then(data => {
@@ -175,20 +137,19 @@
                         let div = document.createElement('div');
                         div.className = 'suggestion-item';
                         
-                        // ФОРМУЄМО ЧИСТУ АДРЕСУ: Вулиця + Номер + Місто
+                        // ЧИСТА АДРЕСА: Вулиця + Номер + Місто
                         let street = item.address.road || item.address.pedestrian || item.address.suburb || "";
                         let number = item.address.house_number || "";
-                        let city = item.address.city || item.address.town || item.address.village || "";
+                        let city = item.address.city || item.address.town || item.address.village || "Rzeszów";
                         
-                        if (!street) street = item.display_name.split(',')[0]; // Якщо вулиці немає, беремо назву об'єкта
+                        if (!street) street = item.display_name.split(',')[0];
 
-                        let cleanAddress = "";
-                        if(street) cleanAddress += street;
+                        // Склеюємо
+                        let cleanAddress = street;
                         if(number) cleanAddress += " " + number;
-                        if(city) cleanAddress += ", " + city;
+                        cleanAddress += ", " + city;
 
                         div.innerText = cleanAddress;
-                        
                         div.onclick = function() {
                             document.getElementById('address').value = cleanAddress;
                             list.style.display = 'none';
@@ -197,14 +158,12 @@
                     });
                 } else { list.style.display = 'none'; }
             })
-            .catch(err => log("Помилка карти: " + err));
+            .catch(err => console.log(err));
         }, 300);
     }
     
     document.addEventListener('click', function(e) {
-        if(e.target.id !== 'address') {
-            document.getElementById('suggestions').style.display = 'none';
-        }
+        if(e.target.id !== 'address') document.getElementById('suggestions').style.display = 'none';
     });
 </script>
 </body>
